@@ -5,6 +5,8 @@ import time
 import os 
 import random 
 
+pygame.font.init()
+
 # Declare constants 
 WIN_WIDTH = 600
 WIN_HEIGHT = 800
@@ -21,6 +23,8 @@ PIPE_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "
 BASE_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "base.png")))
 
 BACKGROUND_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "background.png")))
+
+SCORE_FONT = pygame.font.SysFont('simsun', 48)
 
 class Bird:
     IMAGES = BIRD_IMAGES
@@ -113,10 +117,100 @@ class Bird:
 
     def get_mask(self):
         return pygame.mask.from_surface(self.image)
+
+class Pipe: 
+
+    # Space in between the pipes 
+    GAP = 200
+    # Move the pipe backwards to make it seem like the bird is moving forward while playing
+    VELOCITY = 5
+
+    def __init__(self, x):
+        self.x = x
+        self.height = 0
+
+        self.top = 0
+        self.bottom = 0
+
+        # Grab the images for the top and bottom pipes so flip one upside down
+        self.PIPE_TOP = pygame.transform.flip(PIPE_IMAGE, False, True)
+        self.PIPE_BOTTOM = PIPE_IMAGE
+
+        # Collision purposes - Has the bird passed this pipe yet?
+        self.passed = False
+
+        # Function to define how tall the top and bottom pipes are  
+        self.set_height()
+    
+    def set_height(self):
+        self.height = random.randrange(50, 450)
+        self.top = self.height - self.PIPE_TOP.get_height()
+        self.bottom = self.height + self.GAP
+    
+    def move(self):
+        # Change the x position to the left according to the velocity 
+        self.x -= self.VELOCITY
+    
+    def draw(self, win):
+        win.blit(self.PIPE_TOP, (self.x, self.top))
+        win.blit(self.PIPE_BOTTOM, (self.x, self.bottom))
+
+    def collide(self, bird):
+        bird_mask = bird.get_mask()
+
+        # Create a mask from the top and bottom pipe 
+        top_mask = pygame.mask.from_surface(self.PIPE_TOP)
+        bottom_mask = pygame.mask.from_surface(self.PIPE_BOTTOM)
+
+        top_offset = (self.x - bird.x, self.top - round(bird.y))
+        bottom_offset = (self.x - bird.x, self.bottom - round(bird.y))
+
+        # Check if there is a collision in these masks 
+        bottom_point = bird_mask.overlap(bottom_mask, bottom_offset)
+        top_point = bird_mask.overlap(top_mask, top_offset)
+        if top_point or bottom_point: 
+            return True
+    
+        # If None in both, then no collision 
+        return False
+
+class Base: 
+    # This should be the same as the pipe so everything moves uniformly 
+    VELOCITY = 5
+
+    WIDTH = BASE_IMAGE.get_width()
+    IMAGE = BASE_IMAGE
+
+    def __init__(self, y):
+        self.y = y
+        self.x1 = 0
+        self.x2 = self.WIDTH
+
+    def move(self):
+        self.x1 -= self.VELOCITY
+        self.x2 -= self.VELOCITY
+
+        if self.x1 + self.WIDTH < 0:
+            self.x1 = self.x2 + self.WIDTH
+        if self.x2 + self.WIDTH < 0:
+            self.x2 = self.x1 + self.WIDTH
         
-def draw_window(win, bird): 
-    # Draw the bird on top of the background image 
+    def draw(self, win):
+        win.blit(self.IMAGE, (self.x1, self.y))
+        win.blit(self.IMAGE, (self.x2, self.y))
+
+def draw_window(win, bird, pipes, base, score): 
+    
+    # Draw everything on top of the background image 
     win.blit(BACKGROUND_IMAGE, (0,0))
+
+    for pipe in pipes: 
+        pipe.draw(win)
+    
+    text = SCORE_FONT.render("Score: " + str(score), 1, (255,255,255))
+    win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
+
+    base.draw(win)
     
     bird.draw(win)
     pygame.display.update()
@@ -126,10 +220,19 @@ def main():
     # Define the window 
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
+    # Put the base at the Bottom of the screen
+    base = Base(730)
+
+    # Throw the pipes on the screen
+    pipes = [Pipe(600)]
+
+
     # Define the bird along with its starting position
-    bird = Bird(200, 200)
+    bird = Bird(230, 350)
 
     clock = pygame.time.Clock()
+
+    score = 0 
 
     run = True
     while run:
@@ -138,7 +241,46 @@ def main():
             if event.type == pygame.QUIT:
                 run = False
         # bird.move()
-        draw_window(win, bird)        
+
+        base.move()
+
+        # List of removed pipes as they cross off the screen
+        add_pipe = False
+        rem = []
+
+        for pipe in pipes:
+
+            # Check for a collision  
+            if pipe.collide(bird):
+                pass
+
+            # Remove the pipe if it has moved off the screen
+            if pipe.x + pipe.PIPE_TOP.get_width() < 0:
+                rem.append(pipe)
+            
+            if not pipe.passed and pipe.x < bird.x:
+                pipe.passed = True
+                add_pipe = True
+
+            pipe.move()
+
+        if add_pipe: 
+
+            # Increase the score once you cross a pipe 
+            score += 1
+            # Add a new pipe for the bird to encounter 
+            pipes.append(Pipe(600))
+        
+        # Remove the pipes that go off the screen
+        for r in rem:
+            pipes.remove(r)
+
+        # If bird hits the ground, then you lose 
+        if bird.y + bird.image.get_height() >= 730:
+            pass
+
+
+        draw_window(win, bird, pipes, base, score)        
     pygame.quit()
     quit()
 
