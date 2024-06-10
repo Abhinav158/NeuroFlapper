@@ -1,4 +1,5 @@
 # Import all necessary packages
+import neat.population
 import pygame 
 import neat 
 import time 
@@ -8,8 +9,10 @@ import random
 pygame.font.init()
 
 # Declare constants 
-WIN_WIDTH = 600
+WIN_WIDTH = 550
 WIN_HEIGHT = 800
+
+GEN = -1
 
 # Grab the images and scale it up to 2x the original size
 BIRD_IMAGES = [
@@ -24,7 +27,8 @@ BASE_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "
 
 BACKGROUND_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "background.png")))
 
-SCORE_FONT = pygame.font.SysFont('simsun', 48)
+SCORE_FONT = pygame.font.Font('LuckiestGuy-Regular.ttf', 48)
+
 
 class Bird:
     IMAGES = BIRD_IMAGES
@@ -199,7 +203,7 @@ class Base:
         win.blit(self.IMAGE, (self.x1, self.y))
         win.blit(self.IMAGE, (self.x2, self.y))
 
-def draw_window(win, bird, pipes, base, score): 
+def draw_window(win, birds, pipes, base, score, gen): 
     
     # Draw everything on top of the background image 
     win.blit(BACKGROUND_IMAGE, (0,0))
@@ -210,13 +214,20 @@ def draw_window(win, bird, pipes, base, score):
     text = SCORE_FONT.render("Score: " + str(score), 1, (255,255,255))
     win.blit(text, (WIN_WIDTH - 10 - text.get_width(), 10))
 
+    text = SCORE_FONT.render("Gen: " + str(gen), 1, (255,255,255))
+    win.blit(text, (10, 10))
+
     base.draw(win)
-    
-    bird.draw(win)
+    for bird in birds: 
+        bird.draw(win)
     pygame.display.update()
 
 # Run the main loop of the game  
-def main():
+def eval_genomes(genomes, config):
+
+    global GEN 
+    GEN += 1
+
     # Define the window 
     win = pygame.display.set_mode((WIN_WIDTH, WIN_HEIGHT))
 
@@ -226,21 +237,57 @@ def main():
     # Throw the pipes on the screen
     pipes = [Pipe(600)]
 
+    # Define the birds along with their starting position
+    birds = []
 
-    # Define the bird along with its starting position
-    bird = Bird(230, 350)
+    nets = []
+
+    ge = [] 
+
+    for _, g in genomes: 
+        # Setup a bird object and its neural network 
+        net = neat.nn.FeedForwardNetwork.create(g, config)
+        nets.append(net)
+        birds.append(Bird(230, 350))
+        # Set the initial fitness to 0
+        g.fitness = 0
+        ge.append(g)
 
     clock = pygame.time.Clock()
 
     score = 0 
 
     run = True
+
     while run:
         clock.tick(30)
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
                 run = False
-        # bird.move()
+                pygame.quit()
+                quit()
+        
+        # Which pipe do we look at to determine how the bird moves?
+        pipe_index = 0
+        
+        if len(birds) > 0:
+            # If we have passed the pipes, then look at the second pipe on the screen
+            if len(pipes) > 1 and birds[0].x > pipes[0].x + pipes[0].PIPE_TOP.get_width():
+                pipe_index = 1
+        
+        # No birds left 
+        else:
+            run = False
+            break
+        
+        for x, bird in enumerate(birds):
+            bird.move()
+            ge[x].fitness += 0.1
+
+            output = nets[x].activate((bird.y, abs(bird.y - pipes[pipe_index].height), abs(bird.y - pipes[pipe_index].bottom)))
+
+            if output[0] > 0.5:
+                bird.jump()
 
         base.move()
 
@@ -250,17 +297,24 @@ def main():
 
         for pipe in pipes:
 
-            # Check for a collision  
-            if pipe.collide(bird):
-                pass
+            for x, bird in enumerate(birds): 
+                # Check if any bird has had a collision with a pipe 
+                if pipe.collide(bird):
+                    # If a bird hits a pipe, reduce its fitness score 
+                    ge[x].fitness -= 1
+                    birds.pop(x)
+                    nets.pop(x)
+                    ge.pop(x)
 
-            # Remove the pipe if it has moved off the screen
+                
+                # Check if the bird has crossed the pipe 
+                if not pipe.passed and pipe.x < bird.x:
+                    pipe.passed = True
+                    add_pipe = True
+            
+            # Remove the pipe when it moves off screen
             if pipe.x + pipe.PIPE_TOP.get_width() < 0:
                 rem.append(pipe)
-            
-            if not pipe.passed and pipe.x < bird.x:
-                pipe.passed = True
-                add_pipe = True
 
             pipe.move()
 
@@ -268,21 +322,53 @@ def main():
 
             # Increase the score once you cross a pipe 
             score += 1
+            # Give the birds 5 fitness for every pipe passed 
+            for g in ge: 
+                g.fitness += 5
             # Add a new pipe for the bird to encounter 
             pipes.append(Pipe(600))
         
         # Remove the pipes that go off the screen
         for r in rem:
             pipes.remove(r)
+        
+        for x, bird in enumerate(birds): 
 
-        # If bird hits the ground, then you lose 
-        if bird.y + bird.image.get_height() >= 730:
-            pass
+            # If the bird hits the ground, then you lose 
+            if bird.y + bird.image.get_height() >= 730 or bird.y < 0:
+                birds.pop(x)
+                nets.pop(x)
+                ge.pop(x)
 
 
-        draw_window(win, bird, pipes, base, score)        
-    pygame.quit()
-    quit()
+        draw_window(win, birds, pipes, base, score, GEN)        
 
-main()
+
+
+def run(config_path):
+    config = neat.config.Config(
+        neat.DefaultGenome, 
+        neat.DefaultReproduction, 
+        neat.DefaultSpeciesSet, 
+        neat.DefaultStagnation, 
+        config_path
+    )
+
+    # Create a population
+    population = neat.Population(config)
+
+    # Grab detailed section about each population's performance
+    population.add_reporter(neat.StdOutReporter(True))
+    stats = neat.StatisticsReporter()
+    population.add_reporter(stats)
+
+    # Set the fitness function
+    winner = population.run(eval_genomes, 50)
+
+
+
+if __name__ == "__main__":
+    local_directory = os.path.dirname(__file__)
+    config_path = os.path.join(local_directory, "neat-config.txt")
+    run(config_path)
     
