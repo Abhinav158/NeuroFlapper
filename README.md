@@ -1,9 +1,14 @@
 
-# Neuroflyer 
+# Neuroflyer 🐦
 
 Neuroflyer is an educational project aimed at demonstrating the NEAT (NeuroEvolution of Augmenting Topologies) algorithm using the `neat-python` library. The project showcases how to train an AI agent to navigate the classic "Flappy Bird" game, avoiding obstacles (pipes) during its flight. 
 
 Neuroflyer leverages the NEAT algorithm to evolve neural networks capable of controlling the bird's movements in the Flappy Bird game.
+
+## Demo
+
+https://github.com/user-attachments/assets/ea0b936b-7c2e-4d16-80ea-97e8779844e3
+
 
 ## Features
 
