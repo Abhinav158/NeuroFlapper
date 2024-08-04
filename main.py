@@ -9,9 +9,10 @@ import random
 pygame.font.init()
 
 # Declare constants 
-WIN_WIDTH = 550
+WIN_WIDTH  = 550
 WIN_HEIGHT = 800
 
+# Each iteration (or round) will be considered as a generation GEN
 GEN = -1
 
 # Grab the images and scale it up to 2x the original size
@@ -20,15 +21,10 @@ BIRD_IMAGES = [
     pygame.transform.scale2x(pygame.image.load(os.path.join("images", "bird2.png"))),
     pygame.transform.scale2x(pygame.image.load(os.path.join("images", "bird3.png"))),
 ]
-
-PIPE_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "pipe.png")))
-
-BASE_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "base.png")))
-
+PIPE_IMAGE       = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "pipe.png")))
+BASE_IMAGE       = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "base.png")))
 BACKGROUND_IMAGE = pygame.transform.scale2x(pygame.image.load(os.path.join("images", "background.png")))
-
-SCORE_FONT = pygame.font.Font('LuckiestGuy-Regular.ttf', 48)
-
+SCORE_FONT       = pygame.font.Font('LuckiestGuy-Regular.ttf', 48)
 
 class Bird:
     IMAGES = BIRD_IMAGES
@@ -38,6 +34,7 @@ class Bird:
 
     # How much will we rotate on each frame or everytime we move the bird
     ROTATION_VELOCITY = 20
+
     ANIMATION_TIME = 5
 
     # Represent the starting position of the bird
@@ -48,11 +45,11 @@ class Bird:
         # Bird is flat (Facing horizontally) at the start of every game
         self.tilt = 0
 
-        self.tick_count = 0
-        self.velocity = 0
-        self.height = self.y
+        self.tick_count  = 0
+        self.velocity    = 0
+        self.height      = self.y
         self.image_count = 0
-        self.image = self.IMAGES[0]
+        self.image       = self.IMAGES[0]
     
     def jump(self):
 
@@ -361,10 +358,6 @@ def run(config_path):
     population.add_reporter(neat.StdOutReporter(True))
     stats = neat.StatisticsReporter()
     population.add_reporter(stats)
-
-    # Set the fitness function
-    winner = population.run(eval_genomes, 50)
-
 
 
 if __name__ == "__main__":
